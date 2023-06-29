@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, Unique, ManyToOne } from "typeorm"
+import { Entity, PrimaryGeneratedColumn, Column, Unique, ManyToOne, Index } from "typeorm"
 import { User } from "./User"
 
 @Entity()
@@ -9,6 +9,7 @@ export class Post {
     id: number
 
     @Column()
+    @Index({unique: true})
     title: string
 
     @Column()

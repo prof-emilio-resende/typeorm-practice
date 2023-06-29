@@ -9,9 +9,14 @@ AppDataSource.initialize()
     const usrToDelete = await AppDataSource.manager.findOneBy(User, {
       firstName: "Timber",
     });
-    const usrDeleted = await AppDataSource.manager.delete(User, usrToDelete.id);
-    console.log("User deleted!");
-    console.log(usrDeleted);
+    if (usrToDelete) {
+      const usrDeleted = await AppDataSource.manager.delete(
+        User,
+        usrToDelete.id
+      );
+      console.log("User deleted!");
+      console.log(usrDeleted);
+    }
 
     console.log("Inserting a new user into the database...");
     const user = new User();
@@ -92,33 +97,75 @@ AppDataSource.initialize()
       .getOne();
     console.log(firstUser);
 
-
-    const firstUserLeftPost = await AppDataSource.createQueryBuilder(User, "user")
-      .leftJoinAndSelect('user.posts', 'p')
+    const firstUserLeftPost = await AppDataSource.createQueryBuilder(
+      User,
+      "user"
+    )
+      .leftJoinAndSelect("user.posts", "p")
       .where("user.firstName = :name", { name: "Timber" })
       .getOne();
     console.log(firstUserLeftPost);
 
-    const firstUserInnerPost = await AppDataSource.createQueryBuilder(User, "user")
-      .innerJoinAndSelect('user.posts', 'p')
+    const firstUserInnerPost = await AppDataSource.createQueryBuilder(
+      User,
+      "user"
+    )
+      .innerJoinAndSelect("user.posts", "p")
       .where("user.firstName = :name", { name: "Timber" })
       .getOne();
     console.log(firstUserInnerPost);
-    
+
     console.log("repository...");
     const PostRepository = AppDataSource.getRepository(Post).extend({
-        findByTitleAndText(title: string, text: string) {
-            return this.createQueryBuilder("post")
-                .where("post.title = :title", { title })
-                .andWhere("post.text like :text", { text: `%${text}%` })
-                .getMany();
-        },
+      findByTitleAndText(title: string, text: string) {
+        return this.createQueryBuilder("post")
+          .where("post.title = :title", { title })
+          .andWhere("post.text like :text", { text: `%${text}%` })
+          .getMany();
+      },
     });
-    const timberPost = await PostRepository.findByTitleAndText('Timber Post Title', 'Timber');
+    const timberPost = await PostRepository.findByTitleAndText(
+      "Timber Post Title",
+      "Timber"
+    );
     console.log(timberPost);
 
     console.log("native queries...");
-    const rawData = await AppDataSource.manager.query('SELECT * FROM USER');
+    const rawData = await AppDataSource.manager.query("SELECT * FROM USER");
     console.log(rawData);
+
+    console.log("Transaction sample...");
+    console.log("before transaction ...");
+    let allPosts = await AppDataSource.manager.getRepository(Post).find({
+      where: {
+        id: Not(0),
+      },
+    });
+    console.log(allPosts);
+    try {
+      await AppDataSource.manager.transaction(
+        async (transactionalEntityManager) => {
+          const newPost = new Post();
+          newPost.text = "New Post";
+          newPost.title = "New Post Title";
+
+          const newPostDupe = new Post();
+          newPostDupe.text = "Timber Post";
+          newPostDupe.title = "Timber Post Title";
+
+          await transactionalEntityManager.save<Post>(newPost);
+          await transactionalEntityManager.save<Post>(newPostDupe);
+        }
+      );
+    } catch (error) {
+      console.log("expected error ... rollback already happened!");
+    }
+    console.log("after transaction ...");
+    allPosts = await AppDataSource.manager.getRepository(Post).find({
+      where: {
+        id: Not(0),
+      },
+    });
+    console.log(allPosts);
   })
   .catch((error) => console.log(error));
